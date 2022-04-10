@@ -71,8 +71,8 @@ IO::input(FILE* fp)
 				ng = new Graph;
 			}
 			//read vertex num, edge num, vertex label num, edge label num
-			int numVertex, numEdge;
-			fscanf(fp, " %d %d %d %d\n", &numVertex, &numEdge, &(ng->vertexLabelNum), &(ng->edgeLabelNum));
+			int numVertex, numEdge, edgeLabelNum;
+			fscanf(fp, " %d %d %d %d\n", &(ng->vertex_num), &numEdge, &(ng->vlabel_num), &edgeLabelNum);
 		}
 		else if(c1 == 'v')
 		{
@@ -87,44 +87,44 @@ IO::input(FILE* fp)
 			//NOTICE:we treat this graph as directed, each edge represents two
 			//This may cause too many matchings, if to reduce, only add the first one
 			//ng->addEdge(id1, id2, lb+1);
-			ng->addEdge(id1, id2, lb);
+			ng->addEdge(id1, id2);
 			//ng->addEdge(id2, id1, lb);
 		}
 		else 
 		{
 			cerr<<"ERROR in input() -- invalid char"<<endl;
-			return false;
+			return nullptr;
 		}
 	}
 	return NULL;
 }
 
 bool 
-IO::input(Graph*& data_graph)
+IO::input(Graph*& graph, FILE*& fp)
 {
-	data_graph = this->input(this->dfp);
-	if(data_graph == NULL)
+	graph = this->input(fp);
+	if(graph == NULL)
 		return false;
 	this->data_id++;
-	data_graph->preprocessing(true);
+	//data_graph->preprocessing(true);
 	return true;
 }
 
-bool 
-IO::input(vector<Graph*>& query_list)
-{
-	Graph* graph = NULL;
-	while(true)
-	{
-		graph = this->input(qfp);
-		if(graph == NULL) //to the end
-			break;
-		graph->preprocessing(false);
-		query_list.push_back(graph);
-	}
+// bool 
+// IO::input(vector<Graph*>& query_list)
+// {
+// 	Graph* graph = NULL;
+// 	while(true)
+// 	{
+// 		graph = this->input(qfp);
+// 		if(graph == NULL) //to the end
+// 			break;
+// 		//graph->preprocessing(false);
+// 		query_list.push_back(graph);
+// 	}
 
-	return true;
-}
+// 	return true;
+// }
 
 bool 
 IO::output(int qid)

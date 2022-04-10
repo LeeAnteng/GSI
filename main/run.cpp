@@ -43,14 +43,11 @@ main(int argc, const char * argv[])
 	}
 
 	//set the GPU and warmup
-	Match::initGPU(dev);
+	// Match::initGPU(dev);
 
 	long t1 = Util::get_cur_time();
 
 	IO io = IO(query, data, output);
-	//read query file and keep all queries in memory
-	io.input(query_list);
-	int qnum = query_list.size();
 	
 	cerr<<"input ok!"<<endl;
 	long t2 = Util::get_cur_time();
@@ -59,65 +56,12 @@ main(int argc, const char * argv[])
 	int* id_map= NULL;
 	unsigned result_row_num = 0, result_col_num = 0;
 	Graph* data_graph = NULL;
-	//getchar();
-	while(true)
-	{
-		//cout<<"to input the data graph"<<endl;
-		/*getchar();*/
-		if(!io.input(data_graph))
-		{
-			break;
-		}
-		//cout<<"now to print the data graph"<<endl;
-		/*getchar();*/
-		//data_graph->printGraph();
-		/*getchar();*/
-		//NOTICE: we just compare the matching time(include the communication with GPU)
-        long start = Util::get_cur_time();
-		for(i = 0; i < qnum; ++i)
-		{
-			Match m(query_list[i], data_graph);
-			io.output(i);
-		/*getchar();*/
-	//long tt1 = Util::get_cur_time();
-			m.match(io, final_result, result_row_num, result_col_num, id_map);
-	//long tt2 = Util::get_cur_time();
-	//cerr<<"match used: "<<(tt2-tt1)<<"ms"<<endl;
-		/*getchar();*/
-			io.output(final_result, result_row_num, result_col_num, id_map);
-			io.flush();
-			delete[] final_result;
-			/*delete[] id_map;*/
-		//cudaDeviceSynchronize();
-		//NOTICE: if use VF2 dataset(chemical structures), though graphs are small, but the GPU memory will 
-		//be occupied very much because it not really released.
-		//We can use cudaDeviceReset() to reset the device with process to release memory, but this will introduce 
-		//more initialization time.
-		//cudaDeviceReset();
-		}
-        long end = Util::get_cur_time();
-        cerr<<"match used: "<<(end-start)<<" ms"<<endl;
-
-		delete data_graph;
-	}
-
-	cerr<<"match ended!"<<endl;
-	long t3 = Util::get_cur_time();
-
-	//output the time for contrast
-	cerr<<"part 1 used: "<<(t2-t1)<<"ms"<<endl;
-	cerr<<"part 2 used: "<<(t3-t2)<<"ms"<<endl;
-	cerr<<"total time used: "<<(t3-t1)<<"ms"<<endl;
-	//getchar();
-
-	//release all and flush cached writes
-	for(i = 0; i < qnum; ++i)
-	{
-		delete query_list[i];
-	}
-	io.flush();
-	//getchar();
-
+	Graph* query_graph = NULL;
+	io.input(data_graph, io.dfp);
+	io.input(query_graph, io.qfp);
+	data_graph->printGraph();
+	cout<<"*****************************"<<endl;
+	query_graph->printGraph();
 	return 0;
 }
 
