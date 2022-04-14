@@ -1,5 +1,5 @@
 CC = g++
-NVCC = nvcc
+NVCC = nvcc -arch=sm_35 -lcudadevrt -rdc=true -G --ptxas-options=-v -lineinfo -Xcompiler -rdynamic -I ~/cudaToolkit/cub-1.8.0/
 objdir = ./objs/
 CFLAGS = -c -O2 #-fprofile-arcs -ftest-coverage -coverage #-pg
 EXEFLAG = -O2 #-fprofile-arcs -ftest-coverage -coverage #-pg #-O2
@@ -16,4 +16,5 @@ $(objdir)Graph.o: graph/Graph.cpp graph/Graph.h
 
 $(objdir)IO.o: io/IO.cpp io/IO.h
 	$(CC) $(CFLAGS) io/IO.cpp -o $(objdir)IO.o
-
+clean:
+	rm -f $(objdir)*

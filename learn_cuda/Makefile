@@ -5,5 +5,7 @@ CC = g++
 NVCC = nvcc
 main:main.cu
 	$(NVCC)  main.cu -o main
+test: test.cpp
+	$(CC) test.cpp -o test
 clean:
 	rm -rf main a.out

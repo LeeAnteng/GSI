@@ -79,7 +79,7 @@ IO::input(FILE* fp)
 			fscanf(fp, " %d %d\n", &id1, &lb);
 //NOTICE: we add 1 to labels for both vertex and edge, to ensure the label is positive!
 			//ng->addVertex(lb+1); 
-			ng->addVertex(lb); 
+			ng->addVertex(id1, lb); 
 		}
 		else if(c1 == 'e')
 		{

@@ -56,6 +56,7 @@
 #include <algorithm>
 #include <functional>
 #include <utility>
+#include <bitset>
 
 //NOTICE:below are libraries need to link
 #include <math.h>
@@ -68,9 +69,10 @@
 #define MAX_PATTERN_SIZE 1000000000
 
 //for signatures
-#define SIGLEN 64*8
-#define VLEN 32
-#define SIGNUM SIGLEN/VLEN
+// #define SIGLEN 64*8
+// #define VLEN 32
+// #define SIGNUM SIGLEN/VLEN
+#define SIGNUM 8
 #define SIGBYTE sizeof(unsigned)*SIGNUM
 #define HASHSEED 17
 #define HASHSEED2 53

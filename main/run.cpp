@@ -23,7 +23,7 @@ int
 main(int argc, const char * argv[])
 {
 	int i;
-
+	uint2 a;
 	string output = "ans.txt";
 	if(argc > 5 || argc < 3)
 	{
@@ -59,9 +59,9 @@ main(int argc, const char * argv[])
 	Graph* query_graph = NULL;
 	io.input(data_graph, io.dfp);
 	io.input(query_graph, io.qfp);
-	data_graph->printGraph();
-	cout<<"*****************************"<<endl;
-	query_graph->printGraph();
+	data_graph->buildCSR();
+	data_graph->buildSignature(true);
+	data_graph->printSig();
 	return 0;
 }
 

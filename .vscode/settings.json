@@ -25,6 +25,7 @@
         "__config": "cpp",
         "__tuple": "cpp",
         "bit": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "chrono": "cpp"
     }
 }

@@ -8,25 +8,48 @@
 #ifndef _GRAPH_GRAPH_H
 #define _GRAPH_GRAPH_H
 
+
 #include "../util/Util.h"
 
 class Vertex {
 	public:
+	VID id;
 	LABEL label;
-	std::vector<VID> neighbor;
+	std::vector<Vertex> neighbors;
 	Vertex() {
+		id = -1;
 		label = -1;
 	}
-	Vertex(LABEL lb):label(lb){}
+	Vertex(VID id, LABEL lb):id(id), label(lb){}
+	bool operator < (const Vertex& v) {
+		if (this->label == v.label) {
+			return this->id < v.id;
+		}
+		else {
+			return this->label < v.label;
+		}
+	}
 };
 class Graph {
 	public:
+	unsigned vertex_num;
+	unsigned vlabel_num;
+	unsigned undir_edge_num;
+	//for csr
+	unsigned* row_offset;
+	std::pair<uint,uint>* col_offset;
+	//for signature
+	unsigned* sig_table;
 	std::vector<Vertex> vertices;
-	int vertex_num;
-	int vlabel_num;
-	void addVertex(LABEL _vlb);
+	
+	void addVertex(VID id, LABEL _vlb);
 	void addEdge(VID _from, VID _to);
+	
+	void buildCSR();
+	void buildSignature(bool col_oriented);
+	void printCSR();
 	void printGraph();
+	void printSig();
 };
 
 #endif
