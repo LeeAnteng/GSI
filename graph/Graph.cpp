@@ -15,8 +15,8 @@ Graph::addVertex(VID id,LABEL _vlb)
 void 
 Graph::addEdge(VID _from, VID _to)
 {
-	this->vertices[_from].neighbors.push_back(Vertex(_to, vertices[_to].label));
-    this->vertices[_to].neighbors.push_back(Vertex(_from, vertices[_from].label));
+	this->vertices[_from].neighbors.push_back(Neighbor(_to, vertices[_to].label));
+    this->vertices[_to].neighbors.push_back(Neighbor(_from, vertices[_from].label));
 }
 void 
 Graph::buildCSR() {
@@ -27,13 +27,26 @@ Graph::buildCSR() {
         row_offset[i] = row_offset[i - 1] + vertices[i - 1].neighbors.size();
     }
     undir_edge_num = row_offset[vertex_num];
-    col_offset = new pair<uint,uint>[undir_edge_num];
+    //col_offset = new pair<uint,uint>[undir_edge_num];
+    col_label_offset = new unsigned[undir_edge_num];
+    col_nei_offset = new unsigned[undir_edge_num];
+    col_offset = new unsigned[undir_edge_num];
     int j = 0;
     for (int i = 0; i < vertex_num; i++) {
         sort(vertices[i].neighbors.begin(), vertices[i].neighbors.end());
         for (const auto& neig: vertices[i].neighbors) {
-            col_offset[j].first = neig.label;
-            col_offset[j].second = neig.id;
+            // col_offset[j].first = neig.label;
+            // col_offset[j].second = neig.id;
+            col_label_offset[j] = neig.label;
+            col_nei_offset[j] = neig.id;
+            j++;
+        }
+    }
+    j = 0;
+    for (int i = 0; i < vertex_num; i++) {
+        sort(vertices[i].neighbors.begin(), vertices[i].neighbors.end(), [](const Neighbor&v1, const Neighbor& v2){return v1.id < v2.id;});
+        for (const auto& neig : vertices[i].neighbors) {
+            col_offset[j] = neig.id;
             j++;
         }
     }
@@ -152,6 +165,15 @@ Graph::buildSignature(bool col_oriented) {
         }
         delete[] this->sig_table;
         this->sig_table = new_table;
+
+    // bitset<32> s;
+    // for (int k = 0; k < SIGNUM; k++) {
+    //     printf("签名第%d个字段：\n",k);
+    //     for (int i = 0; i < this->vertex_num; i++) {
+    //         printf("vid=%d,sig=%d\n",i,this->sig_table[k * vertex_num + i]);
+    //     }
+    // }
+
     }
     
 
@@ -164,7 +186,7 @@ Graph::printSig() {
         printf("print %d 's signature:\n", i);
         for (int j = 0; j < SIGNUM; j++) {
             s = sig_table[SIGNUM*i + j];
-            cout<<j<<":"<<s<<endl;
+            cout<<j<<":"<<s<<"--"<<sig_table[SIGNUM*i + j]<<endl;
         }
         cout<<"--------------------------"<<endl;
     }
@@ -189,11 +211,11 @@ Graph::printCSR() {
     }
     cout<<endl;
     cout<<"col_offset:"<<endl;
-    for (int i = 0; i < undir_edge_num; i++) {
-        cout<<col_offset[i].first<<" ";
-    }
-    cout<<endl;
-    for (int i = 0; i < undir_edge_num; i++) {
-        cout<<col_offset[i].second<<" ";
-    }
+    // for (int i = 0; i < undir_edge_num; i++) {
+    //     cout<<col_offset[i].first<<" ";
+    // }
+    // cout<<endl;
+    // for (int i = 0; i < undir_edge_num; i++) {
+    //     cout<<col_offset[i].second<<" ";
+    // }
 }

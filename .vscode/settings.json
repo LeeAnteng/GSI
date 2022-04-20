@@ -26,6 +26,13 @@
         "__tuple": "cpp",
         "bit": "cpp",
         "locale": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "memory_resource": "cpp",
+        "shared_mutex": "cpp",
+        "__mutex_base": "cpp",
+        "climits": "cpp",
+        "future": "cpp",
+        "new": "cpp",
+        "type_traits": "cpp"
     }
 }

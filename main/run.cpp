@@ -59,9 +59,18 @@ main(int argc, const char * argv[])
 	Graph* query_graph = NULL;
 	io.input(data_graph, io.dfp);
 	io.input(query_graph, io.qfp);
+	query_graph->buildCSR();
 	data_graph->buildCSR();
-	data_graph->buildSignature(true);
+	query_graph->buildSignature(false);
+	data_graph->buildSignature(false);
+	query_graph->printSig();
 	data_graph->printSig();
+	data_graph->buildSignature(true);
+	//data_graph->printSig();
+
+	//begin match
+	Match m(query_graph,data_graph);
+	m.match(io, final_result, result_row_num, result_col_num, id_map);
 	return 0;
 }
 

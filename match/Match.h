@@ -93,7 +93,7 @@ private:
 	//candidates placed in GPU, only copy the num back
 	bool filter(float* _score, int* _qnum);
 	void acquire_linking(int*& link_pos, int*& link_edge, int& link_num, int idx);
-	bool join(unsigned* d_summary, int* link_pos, int* link_edge, int link_num, unsigned*& d_result, unsigned* d_candidate, unsigned num, unsigned& result_row_num, unsigned& result_col_num);
+	bool join(unsigned label, int* link_pos, int link_num, unsigned*& d_result, unsigned* d_candidate, unsigned num, unsigned& result_row_num, unsigned& result_col_num);
 
 	bool score_node(float* _score, int* _qnum);
 	void update_score(float* _score, int qsize, int _idx);

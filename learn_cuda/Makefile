@@ -3,9 +3,15 @@ CC = g++
 #intermediate files, using --keep for nvcc
 #for PTX codes, using --ptx for nvcc
 NVCC = nvcc
-main:main.cu
-	$(NVCC)  main.cu -o main
+
+CFLAGS = -c -O2 #-fprofile-arcs -ftest-coverage -coverage #-pg
+EXEFLAG = -O2 #-fprofile-arcs -ftest-coverage -coverage #-pg #-O2
+
+main:main.cu Util.o
+	$(NVCC)  main.cu  Util.o -o main
+Util.o : Util.cpp Util.h
+	$(CC) $(CFLAGS) Util.cpp -o Util.o
 test: test.cpp
 	$(CC) test.cpp -o test
 clean:
-	rm -rf main a.out
+	rm -rf ./*.o

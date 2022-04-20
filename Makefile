@@ -4,7 +4,7 @@ objdir = ./objs/
 CFLAGS = -c -O2 #-fprofile-arcs -ftest-coverage -coverage #-pg
 EXEFLAG = -O2 #-fprofile-arcs -ftest-coverage -coverage #-pg #-O2
 
-objfile = $(objdir)Util.o $(objdir)IO.o $(objdir)Graph.o
+objfile = $(objdir)Util.o $(objdir)IO.o $(objdir)Match.o $(objdir)Graph.o
 pre_GSI.exe: $(objfile) main/run.cpp
 	$(NVCC) $(EXEFLAG) -o pre_GSI.exe main/run.cpp $(objfile)
 
@@ -16,5 +16,8 @@ $(objdir)Graph.o: graph/Graph.cpp graph/Graph.h
 
 $(objdir)IO.o: io/IO.cpp io/IO.h
 	$(CC) $(CFLAGS) io/IO.cpp -o $(objdir)IO.o
+
+$(objdir)Match.o: match/Match.cu match/Match.h
+	$(NVCC) $(CFLAGS) match/Match.cu -o $(objdir)Match.o
 clean:
 	rm -f $(objdir)*

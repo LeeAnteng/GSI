@@ -11,24 +11,37 @@
 
 #include "../util/Util.h"
 
+class Neighbor {
+	public:
+	VID id;
+	LABEL label;
+	Neighbor(VID id, LABEL lb):id(id), label(lb){}
+	bool operator < (const Neighbor& nei) {
+		if (this->label == nei.label) {
+			return this->id < nei.id;
+		}
+		return this->label < nei.label;
+	}
+};
+
 class Vertex {
 	public:
 	VID id;
 	LABEL label;
-	std::vector<Vertex> neighbors;
+	std::vector<Neighbor> neighbors;
 	Vertex() {
 		id = -1;
 		label = -1;
 	}
 	Vertex(VID id, LABEL lb):id(id), label(lb){}
-	bool operator < (const Vertex& v) {
-		if (this->label == v.label) {
-			return this->id < v.id;
-		}
-		else {
-			return this->label < v.label;
-		}
-	}
+	// bool operator < (const Vertex& v) {
+	// 	if (this->label == v.label) {
+	// 		return this->id < v.id;
+	// 	}
+	// 	else {
+	// 		return this->label < v.label;
+	// 	}
+	// }
 };
 class Graph {
 	public:
@@ -37,7 +50,10 @@ class Graph {
 	unsigned undir_edge_num;
 	//for csr
 	unsigned* row_offset;
-	std::pair<uint,uint>* col_offset;
+	unsigned* col_nei_offset;
+	unsigned* col_label_offset;
+	unsigned* col_offset;
+	// std::pair<uint,uint>* col_offset;
 	//for signature
 	unsigned* sig_table;
 	std::vector<Vertex> vertices;
