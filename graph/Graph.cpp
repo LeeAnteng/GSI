@@ -140,7 +140,7 @@ Graph::buildSignature(bool col_oriented) {
                     t = t | c;
                     sig_table[basei + 4 + a] = t;
                 }
-                else {//路径哈希
+                {//路径哈希
                     unsigned s[2];
                     s[0] = label;
                     s[1] = nei_label;

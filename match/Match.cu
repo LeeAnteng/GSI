@@ -149,7 +149,7 @@ join_kernel(unsigned label, unsigned* d_result, unsigned* d_candidate, unsigned 
     if (tid < result_col_num){
     // memcpy(row, d_result + block_id * result_col_num, sizeof(unsigned)*result_col_num);
     row[tid] = d_result[block_id * result_col_num + tid];
-    printf("block_id:%d, row[%d]:%d\n", block_id, tid, row[tid]);
+    // printf("block_id:%d, row[%d]:%d\n", block_id, tid, row[tid]);
     }
     if (tid == 0) {
         start_pos = c_link_pos[0];
@@ -184,25 +184,25 @@ join_kernel(unsigned label, unsigned* d_result, unsigned* d_candidate, unsigned 
     init_neibors[tid] = c_col_offset[col_nei_start + tid];
     __syncthreads();
 
-    printf("block_id:%d, init_neibors[%d]:%d, init_nei_len = %d\n", block_id, tid, init_neibors[tid], init_nei_len);
+    // printf("block_id:%d, init_neibors[%d]:%d, init_nei_len = %d\n", block_id, tid, init_neibors[tid], init_nei_len);
     flag[tid] = 1;
     //与C(u)作交集
     unsigned cur_vid = init_neibors[tid];
     unsigned a = cur_vid >> 5;
     unsigned b = cur_vid & 0x1f;
-    printf("a=%d\n",a);
-    printf("c_candidate[a] = %d\n",c_candidate[a]);
+    // printf("block_id = %d, tid = %d, a=%d, b = %d \n",block_id, tid,a, b);
+    // printf("c_candidate[a] = %d\n",c_candidate[a]);
     b = 1 << b;
     if ((c_candidate[a] & b ) != b) {flag[tid] = 0;}
     
     __syncthreads();
-    printf("block_id = %d\n , C(u) intersect ok", block_id);
+    // printf("block_id = %d\n , C(u) intersect ok", block_id);
     //减去已匹配的点
     for (int j = 0; j < result_col_num ; j++) {
         if(j == start_pos) continue;
         if(flag[tid] != 0 && row[j] == init_neibors[tid]) {flag[tid] = 0;}
     }
-    printf("block_tid = %d, flag[%d] = %d\n", block_id, tid, flag[tid]);
+    // printf("block_tid = %d, flag[%d] = %d\n", block_id, tid, flag[tid]);
     __syncthreads();
     //与N(vi,l0)作交集
     for (int k = 1; k < c_link_count; k++) {
@@ -764,6 +764,8 @@ Match::join(unsigned label, int* link_pos,int link_num, unsigned*& d_result, uns
 
    unsigned BLOCKSIZE = 1024;
    unsigned GRIDSIZE = result_row_num;
+   cudaMemcpyToSymbol(c_candidate, &d_candidate, sizeof(unsigned*));
+
    join_kernel<<<GRIDSIZE, BLOCKSIZE>>>(label, d_result, d_candidate, result_row_num, result_col_num);
    cudaDeviceSynchronize();
    #ifdef DEBUG
