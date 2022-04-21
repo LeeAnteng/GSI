@@ -62,15 +62,19 @@ main(int argc, const char * argv[])
 	query_graph->buildCSR();
 	data_graph->buildCSR();
 	query_graph->buildSignature(false);
-	data_graph->buildSignature(false);
-	query_graph->printSig();
-	data_graph->printSig();
+	data_graph->printCSR();
+	// data_graph->buildSignature(false);
+	// query_graph->printSig();
+	// data_graph->printSig();
 	data_graph->buildSignature(true);
 	//data_graph->printSig();
 
 	//begin match
 	Match m(query_graph,data_graph);
 	m.match(io, final_result, result_row_num, result_col_num, id_map);
+	io.output(final_result, result_row_num, result_col_num, id_map);
+	io.flush();
+	delete[] final_result;
 	return 0;
 }
 

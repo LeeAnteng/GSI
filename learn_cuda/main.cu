@@ -18,12 +18,13 @@
 #include "device_launch_parameters.h"  
 #include <stdio.h>  
 
-#define N 1000
+#define N 10
 using namespace std;
 
 __device__ __managed__ unsigned qnum[N];
 __device__ unsigned* temp_res[N];
 __device__ unsigned b[N];
+__constant__ unsigned *aa;
 void initGPU(int dev)
 {
     int deviceCount;
@@ -144,8 +145,9 @@ __global__ void test2_kernel(unsigned* d_array1, unsigned** d_array2, unsigned a
 }
 __global__ void test3_kernel() {
     unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < N)
-    atomicOr(&b[N-1], 31);
+    if (tid >= N) return;
+    unsigned * aaa = aa + 3;
+    printf("%d ",aaa[tid]);
     // b[tid] |= 31;
     // atomicAdd(&b,1);
     // __syncthreads();
@@ -255,14 +257,16 @@ __global__ void work_efficient_scan_kernel(unsigned *X, int InputSize) {
 
 int main()
 {
-    initGPU(0);
-    for (int i = 0; i < N; i++)
-    qnum[i] = i&1;
-    pre_sum_block<<<1, 1024>>>(qnum, N);
+    unsigned *d_array;
+    cudaMalloc(&d_array, sizeof(unsigned) * N);
+    unsigned* h_array = new unsigned[N];
+    for (int i = 0;i < N; i++) {
+        h_array[i] = i*3;
+    }
+    cudaMemcpy(d_array, h_array, sizeof(unsigned) * N, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(aa,&d_array,sizeof(unsigned*));
+    test3_kernel<<<1,1024>>>();
     cudaDeviceSynchronize();
-    for (int i = 0; i < N + 1; i++)
-    printf("%d ", qnum[i]);
-    
     // cudaDeviceProp devProp;
     // cudaGetDeviceProperties(&devProp, dev);
     // std::cout << "使用GPU device " << dev << ": " << devProp.name << std::endl;

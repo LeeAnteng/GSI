@@ -211,6 +211,19 @@ Graph::printCSR() {
     }
     cout<<endl;
     cout<<"col_offset:"<<endl;
+    for(int i = 0; i < undir_edge_num; i++) {
+        cout<<col_offset[i] << " ";
+    }
+    cout<<endl;
+    cout<<"col_label_offset:"<<endl;
+    for(int i = 0; i < undir_edge_num; i++) {
+        cout<<col_label_offset[i] << " ";
+    }
+    cout<<endl;
+    cout<<"col_nei_offset:"<<endl;
+    for(int i = 0; i < undir_edge_num; i++) {
+        cout<<col_nei_offset[i] << " ";
+    }
     // for (int i = 0; i < undir_edge_num; i++) {
     //     cout<<col_offset[i].first<<" ";
     // }

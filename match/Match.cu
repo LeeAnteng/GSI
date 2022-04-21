@@ -73,9 +73,11 @@ link_kernel(unsigned*d_result, unsigned* d_new_result, unsigned result_col_num, 
 
 __device__ unsigned low_bound(unsigned target, unsigned* array, unsigned len) {
     unsigned left = 0, right = len - 1;
-    while (left < right) {
+    printf ("left = %d, right = %d\n", left, right);
+    while (left <= right) {
         int mid = left + (right - left) / 2;
-        if (array[mid] >= target) right = mid;
+        printf("target = %d, array[%d] = %d\n",target, mid,array[mid]);
+        if (array[mid] >= target) right = mid - 1;
         else left = mid + 1;
     }
     return left;
@@ -139,49 +141,68 @@ join_kernel(unsigned label, unsigned* d_result, unsigned* d_candidate, unsigned 
     //__shared__ unsigned isSelected[1024];
     __shared__ unsigned row[64];
     __shared__ unsigned label_start_idx , label_end_idx;
-    __shared__ unsigned neiwithlabel_len;
+    __shared__ unsigned init_nei_len;
     __shared__ unsigned final_res_len;
     unsigned block_id = blockIdx.x;
     unsigned tid = threadIdx.x;
     if (block_id >= result_row_num) return;
-    if (tid < result_col_num)
+    if (tid < result_col_num){
     // memcpy(row, d_result + block_id * result_col_num, sizeof(unsigned)*result_col_num);
     row[tid] = d_result[block_id * result_col_num + tid];
+    printf("block_id:%d, row[%d]:%d\n", block_id, tid, row[tid]);
+    }
     if (tid == 0) {
         start_pos = c_link_pos[0];
         unsigned vid = row[start_pos];
         col_nei_start = c_row_offset[vid];
-        unsigned nei_count = c_row_offset[vid + 1] - c_row_offset[vid];
-        unsigned* nei_label_begin = c_col_label + col_nei_start;
-        unsigned* nei_vid_begin = c_col_index + col_nei_start;
-        label_start_idx = low_bound(label, nei_label_begin, nei_count);
-        label_end_idx = -1;
-        if (nei_label_begin[label_start_idx] == label){
-            label_end_idx = low_bound(label + 1, nei_label_begin, nei_count);
-            neiwithlabel_len = label_end_idx - label_start_idx;
-            // final_res_len = neiwithlabel_len;
-            // memcpy(init_neibors, nei_vid_begin + label_start_idx, sizeof(unsigned) * neiwithlabel_len);
-        }
+        init_nei_len = c_row_offset[vid + 1] - c_row_offset[vid];
+        // start_pos = c_link_pos[0];
+        // unsigned vid = row[start_pos];
+        // col_nei_start = c_row_offset[vid];
+        // unsigned nei_count = c_row_offset[vid + 1] - c_row_offset[vid];
+        // unsigned* nei_label_begin = c_col_label + col_nei_start;
+        // unsigned* nei_vid_begin = c_col_index + col_nei_start;
+        // printf("block_id:%d, vid = %d, nei_count = %d, col_nei_start = %d\n", block_id, vid, nei_count, col_nei_start);
+        // label_start_idx = low_bound(label, nei_label_begin, nei_count);
+        // printf("block_id:%d,label_start_idx = %d\n",block_id, label_start_idx);
+        // label_end_idx = -1;
+        
+        // if (label_start_idx < nei_count && nei_label_begin[label_start_idx] == label){
+        //     label_end_idx = low_bound(label + 1, nei_label_begin, nei_count);
+        //     printf("block_id:%d,label_end_idx = %d\n",block_id, label_end_idx);
+
+        //     neiwithlabel_len = label_end_idx - label_start_idx;
+        //     // final_res_len = neiwithlabel_len;
+        //     // memcpy(init_neibors, nei_vid_begin + label_start_idx, sizeof(unsigned) * neiwithlabel_len);
+        // }
         
     }
     __syncthreads();
-    if(label_end_idx == -1) return;
-    if (tid >= neiwithlabel_len) return;
+    // if(label_end_idx == -1) return;
+    if (tid >= init_nei_len) return;
     
-    init_neibors[tid] = c_col_index[col_nei_start + label_start_idx + tid];
+    init_neibors[tid] = c_col_offset[col_nei_start + tid];
+    __syncthreads();
+
+    printf("block_id:%d, init_neibors[%d]:%d, init_nei_len = %d\n", block_id, tid, init_neibors[tid], init_nei_len);
     flag[tid] = 1;
     //与C(u)作交集
     unsigned cur_vid = init_neibors[tid];
     unsigned a = cur_vid >> 5;
     unsigned b = cur_vid & 0x1f;
+    printf("a=%d\n",a);
+    printf("c_candidate[a] = %d\n",c_candidate[a]);
     b = 1 << b;
     if ((c_candidate[a] & b ) != b) {flag[tid] = 0;}
+    
     __syncthreads();
+    printf("block_id = %d\n , C(u) intersect ok", block_id);
     //减去已匹配的点
     for (int j = 0; j < result_col_num ; j++) {
         if(j == start_pos) continue;
         if(flag[tid] != 0 && row[j] == init_neibors[tid]) {flag[tid] = 0;}
     }
+    printf("block_tid = %d, flag[%d] = %d\n", block_id, tid, flag[tid]);
     __syncthreads();
     //与N(vi,l0)作交集
     for (int k = 1; k < c_link_count; k++) {
@@ -274,7 +295,7 @@ join_kernel(unsigned label, unsigned* d_result, unsigned* d_candidate, unsigned 
     if (tid == 0) flag[tid] = 0;
     flag[tid + 1]=val;
     __syncthreads();
-    final_res_len = flag[neiwithlabel_len];
+    final_res_len = flag[init_nei_len];
     if (final_res_len == 0) return;
     if (tid == 0) {
         res = (unsigned*) malloc(sizeof(unsigned) * final_res_len);
@@ -614,7 +635,7 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 	/*cout<<"assign d_qnum"<<endl;*/
 
 	/*cout<<"to filter"<<endl;*/
-	bool success = filter(score, qnum);
+	bool success_filter = filter(score, qnum);
     long t2 = Util::get_cur_time();
 	cout<<"filter used: "<<(t2-t1)<<"ms"<<endl;
     for(int i = 0; i < qsize; ++i)
@@ -625,7 +646,7 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 #ifdef DEBUG
 	cout<<"filter finished"<<endl;
 #endif
-	if(!success)
+	if(!success_filter)
 	{
 		delete[] score;
 		delete[] qnum;
@@ -668,7 +689,7 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 	cout<<"intermediate table built"<<endl;
 
     
-
+    bool success;
     for (int step = 1; step < qsize; step++) {
         cout<<"this is the "<<step<<" round"<<endl;
 
@@ -691,6 +712,7 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 		this->acquire_linking(link_pos, link_edge, link_num, idx2);
         long t7 = Util::get_cur_time();
         cerr<<"acquire linking used: "<<(t7-t6)<<"ms"<<endl;
+        
 
         long tmp1 = Util::get_cur_time();
         //build the bitset
@@ -711,9 +733,29 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
         cudaMemcpyToSymbol(c_link_count, &link_num, sizeof(unsigned));
         cudaMemcpyToSymbol(c_link_pos, link_pos, sizeof(unsigned) * link_num);
 
-        bool success = this->join(node_label, link_pos, link_num, d_result, d_candidate, candidate_num, result_row_num, result_col_num);
-
+        success = this->join(node_label, link_pos, link_num, d_result, d_candidate, candidate_num, result_row_num, result_col_num);
+        #ifdef DEBUG
+	    checkCudaErrors(cudaGetLastError());
+        #endif
+        delete[] link_pos;
+        if (!success) break;
+        idx = idx2;
+        
     }
+    if (success) {
+        final_result = new unsigned[result_row_num * result_col_num];
+        cudaMemcpy(final_result, d_result, sizeof(unsigned) * result_row_num * result_col_num, cudaMemcpyDeviceToHost);
+    }
+    else {
+        final_result = NULL;
+        result_row_num = 0;
+        result_col_num = qsize;
+    }
+    id_map = this->id2pos;
+
+    delete[] score;
+    delete[] qnum;
+    release();
 }
 
 bool
@@ -721,9 +763,12 @@ Match::join(unsigned label, int* link_pos,int link_num, unsigned*& d_result, uns
 {
 
    unsigned BLOCKSIZE = 1024;
-   unsigned GRIDSIZE = (result_row_num + BLOCKSIZE - 1) / BLOCKSIZE;
+   unsigned GRIDSIZE = result_row_num;
    join_kernel<<<GRIDSIZE, BLOCKSIZE>>>(label, d_result, d_candidate, result_row_num, result_col_num);
    cudaDeviceSynchronize();
+   #ifdef DEBUG
+	checkCudaErrors(cudaGetLastError());
+   #endif
 
    exclusive_sum(temp_row_count, result_row_num + 1);
 //    unsigned* h_temp_row_count = new unsigned[result_row_num + 1];
@@ -735,6 +780,9 @@ Match::join(unsigned label, int* link_pos,int link_num, unsigned*& d_result, uns
    cudaMalloc(&d_new_result, sizeof(unsigned) * temp_res_size);
    link_kernel<<<GRIDSIZE, BLOCKSIZE>>>(d_result, d_new_result, result_col_num, result_row_num);
    cudaDeviceSynchronize();
+   #ifdef DEBUG
+	checkCudaErrors(cudaGetLastError());
+   #endif
    clean_kernel<<<GRIDSIZE,BLOCKSIZE>>>(result_row_num);
    cudaDeviceSynchronize();
    result_row_num = new_result_row_num;
