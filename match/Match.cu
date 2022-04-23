@@ -4,17 +4,15 @@
 using namespace std;
 
 __constant__ unsigned* c_row_offset;
-__constant__ unsigned* c_col_index;
-__constant__ unsigned* c_col_label;
+// __constant__ unsigned* c_col_index;
+// __constant__ unsigned* c_col_label;
 __constant__ unsigned* c_col_offset;
 
 __constant__ unsigned c_data_vertex_count;
 __constant__ unsigned c_data_edge_count;
-__constant__ unsigned c_link_pos[100];
+__constant__ unsigned c_link_pos;
 __constant__ unsigned c_link_count;
 
-__device__ __managed__ unsigned* temp_res[1024];
-__device__ __managed__ unsigned temp_row_count[1024];
 
 __constant__ unsigned c_key_num;
 __constant__ unsigned* c_result_tmp_pos;
@@ -31,57 +29,7 @@ __constant__ unsigned c_link_edge;
 __constant__ unsigned c_signature[SIGNUM];
 
 
-__global__ void
-clean_kernel(unsigned result_row_num) {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid > result_row_num) return;
-    temp_row_count[tid] = 0;
-    if (temp_res[tid] != NULL) {
-        free (temp_res[tid]);
-        temp_res[tid] = NULL;
-    }
-}
-__global__ void 
-link_kernel(unsigned*d_result, unsigned* d_new_result, unsigned result_col_num, unsigned result_row_num) {
-    __shared__ unsigned write_row_count;
-    __shared__ unsigned begin_write_row;
-    __shared__ unsigned row[64];
-    unsigned block_id = blockIdx.x;
-    unsigned tid = threadIdx.x;
-    unsigned warpid = tid >> 5;
-    if(block_id >= result_row_num) return;
-    if (tid == 0) {
-        write_row_count = temp_row_count[block_id + 1] - temp_row_count[block_id];
-        begin_write_row = temp_row_count[block_id];
-    }
-    __syncthreads();
-    if (write_row_count == 0) return;
-    if(tid <= result_col_num) {
-        if (tid != result_col_num)
-        row[tid] = d_result[block_id * result_col_num + tid];
-        __syncthreads();
-        for (int i = 0; i < write_row_count; i++) {
-            if (tid != result_col_num)
-            d_new_result[(begin_write_row + i) * (result_col_num + 1) + tid] = row[tid];
-            else 
-            d_new_result[(begin_write_row + i) * (result_col_num + 1) + tid] = temp_res[block_id][i];
-        }
-        __syncthreads();
-    }
-    // memcpy(row, d_result + block_id * result_col_num, result_col_num * sizeof(unsigned));
-}
 
-__device__ unsigned low_bound(unsigned target, unsigned* array, unsigned len) {
-    unsigned left = 0, right = len - 1;
-    printf ("left = %d, right = %d\n", left, right);
-    while (left <= right) {
-        int mid = left + (right - left) / 2;
-        printf("target = %d, array[%d] = %d\n",target, mid,array[mid]);
-        if (array[mid] >= target) right = mid - 1;
-        else left = mid + 1;
-    }
-    return left;
-}
 __device__ unsigned
 binary_search(unsigned _key, unsigned* _array, unsigned _array_num)
 {
@@ -130,197 +78,6 @@ binary_search(unsigned _key, unsigned* _array, unsigned _array_num)
 /*#endif*/
 }
 
-
-__global__  void 
-join_kernel(unsigned label, unsigned* d_result, unsigned* d_candidate, unsigned result_row_num, unsigned result_col_num) {
-    __shared__ unsigned init_neibors[1024];
-    __shared__ unsigned flag[1024];
-    __shared__ unsigned start_pos;
-    __shared__ unsigned col_nei_start;
-    __shared__ unsigned *res;
-    //__shared__ unsigned isSelected[1024];
-    __shared__ unsigned row[64];
-    __shared__ unsigned label_start_idx , label_end_idx;
-    __shared__ unsigned init_nei_len;
-    __shared__ unsigned final_res_len;
-    unsigned block_id = blockIdx.x;
-    unsigned tid = threadIdx.x;
-    if (block_id >= result_row_num) return;
-    if (tid < result_col_num){
-    // memcpy(row, d_result + block_id * result_col_num, sizeof(unsigned)*result_col_num);
-    row[tid] = d_result[block_id * result_col_num + tid];
-    // printf("block_id:%d, row[%d]:%d\n", block_id, tid, row[tid]);
-    }
-    if (tid == 0) {
-        start_pos = c_link_pos[0];
-        unsigned vid = row[start_pos];
-        col_nei_start = c_row_offset[vid];
-        init_nei_len = c_row_offset[vid + 1] - c_row_offset[vid];
-        // start_pos = c_link_pos[0];
-        // unsigned vid = row[start_pos];
-        // col_nei_start = c_row_offset[vid];
-        // unsigned nei_count = c_row_offset[vid + 1] - c_row_offset[vid];
-        // unsigned* nei_label_begin = c_col_label + col_nei_start;
-        // unsigned* nei_vid_begin = c_col_index + col_nei_start;
-        // printf("block_id:%d, vid = %d, nei_count = %d, col_nei_start = %d\n", block_id, vid, nei_count, col_nei_start);
-        // label_start_idx = low_bound(label, nei_label_begin, nei_count);
-        // printf("block_id:%d,label_start_idx = %d\n",block_id, label_start_idx);
-        // label_end_idx = -1;
-        
-        // if (label_start_idx < nei_count && nei_label_begin[label_start_idx] == label){
-        //     label_end_idx = low_bound(label + 1, nei_label_begin, nei_count);
-        //     printf("block_id:%d,label_end_idx = %d\n",block_id, label_end_idx);
-
-        //     neiwithlabel_len = label_end_idx - label_start_idx;
-        //     // final_res_len = neiwithlabel_len;
-        //     // memcpy(init_neibors, nei_vid_begin + label_start_idx, sizeof(unsigned) * neiwithlabel_len);
-        // }
-        
-    }
-    __syncthreads();
-    // if(label_end_idx == -1) return;
-    if (tid >= init_nei_len) return;
-    
-    init_neibors[tid] = c_col_offset[col_nei_start + tid];
-    __syncthreads();
-
-    // printf("block_id:%d, init_neibors[%d]:%d, init_nei_len = %d\n", block_id, tid, init_neibors[tid], init_nei_len);
-    flag[tid] = 1;
-    //与C(u)作交集
-    unsigned cur_vid = init_neibors[tid];
-    unsigned a = cur_vid >> 5;
-    unsigned b = cur_vid & 0x1f;
-    // printf("block_id = %d, tid = %d, a=%d, b = %d \n",block_id, tid,a, b);
-    // printf("c_candidate[a] = %d\n",c_candidate[a]);
-    b = 1 << b;
-    if ((c_candidate[a] & b ) != b) {flag[tid] = 0;}
-    
-    __syncthreads();
-    // printf("block_id = %d\n , C(u) intersect ok", block_id);
-    //减去已匹配的点
-    for (int j = 0; j < result_col_num ; j++) {
-        if(j == start_pos) continue;
-        if(flag[tid] != 0 && row[j] == init_neibors[tid]) {flag[tid] = 0;}
-    }
-    // printf("block_tid = %d, flag[%d] = %d\n", block_id, tid, flag[tid]);
-    __syncthreads();
-    //与N(vi,l0)作交集
-    for (int k = 1; k < c_link_count; k++) {
-        if (flag[tid] != 0) {
-            unsigned vid = row[c_link_pos[k]];
-            unsigned col_nei_begin = c_row_offset[vid];
-            unsigned nei_count = c_row_offset[vid + 1] -c_row_offset[vid];
-            unsigned isFound = binary_search(init_neibors[tid], c_col_offset + col_nei_begin, nei_count);
-            if (isFound == INVALID) {
-                flag[tid] = 0;
-            }
-        }
-    }
-
-
-    //与N(vi,l0)作交集
-    // for (int k = 1; k < c_link_count; k++){
-    //     if (init_neibors[tid] != -1 ) {
-    //         unsigned vid = row[c_link_pos[k]];
-    //         unsigned col_nei_start = c_row_offset[vid];
-    //         unsigned nei_count = c_row_offset[vid + 1] - c_row_offset[vid];
-    //         unsigned* nei_label_begin = c_col_label + col_nei_start;
-    //         unsigned* nei_vid_begin = c_col_index + col_nei_start;
-    //         unsigned label_start = low_bound(label, nei_label_begin, nei_count);
-    //         if (nei_label_begin[label_start] == label){
-    //             unsigned label_end = low_bound(label + 1, nei_label_begin, nei_count);
-    //             unsigned isFound = binary_search(init_neibors[tid], nei_vid_begin + label_start, label_end - label_start);
-    //             if(isFound == INVALID) {
-    //                 init_neibors[tid] = -1;final_res_len--;
-    //             }
-    //         }
-    //         else {
-    //             init_neibors[tid] = -1;final_res_len--;
-    //         }
-            
-    //     } 
-    // }
-    
-    __syncthreads();
-
-    const int wrapId = tid / 32;
-    const int wraps =blockDim.x / 32; // wraps<=32
-    const int laneId = tid & (32-1);// 取二进制最后五位，是 threadIdx对32取模的结果。
-
-    // if(tid>=length) return;
-    // 越界
-    unsigned val = flag[tid]; // 每个线程的 负责一个数据，本地寄存器上
-    __shared__ unsigned pre_sum_block [32]; // 每个wrap的最后一个前缀和放在上面
-    // const int iters = 
-    // 计算 wrap内的前缀和
-    #pragma unroll 5
-    for(int delta=1;delta<32;delta=delta*2) // 因为warp_size=32，否则应该是 delta< log2f(warp_size)
-    {
-        
-         unsigned temp=__shfl_up_sync(0xFFFFFFFF,val,delta,32);
-         if (laneId >=delta)
-             val += temp;
-        
-    }
-    // wrap是隐式同步的，限制每个wrap单独计算了前缀和
-    if( laneId == 32-1)
-    {
-        // 一个wrap最后一个数
-        pre_sum_block[wrapId]=val;
-    }
-    // 对shared memory的数求前缀和 ,wraps肯定是少于32的
-    __syncthreads();// block内同步
-
-    if(tid<32) // 取第一个wrap对pre_sum_block计算
-    {
-        unsigned warp_share_val = tid<wraps ?  pre_sum_block[tid] :0;
-        #pragma unroll 5
-        for(int delta=1;delta<32;delta=delta*2) // 因为warp_size=32，否则应该是 delta< log2f(warp_size)
-        {
-            unsigned temp=__shfl_up_sync(0xFFFFFFFF,warp_share_val,delta,32);
-            if (laneId >=delta)
-                warp_share_val += temp;
-        }
-
-        if(tid<wraps) 
-            pre_sum_block[tid]= warp_share_val; // 每个wrap最后一个前缀和组成共享数组 的前缀和
-
-    }
-    __syncthreads();// block内同步，因为不同的warp要读share_memory
-    if(wrapId>=1)  // 这里是 >=
-    {
-        //取wrap左边一个数
-        val+=pre_sum_block[wrapId-1];
-    }
-    if (tid == 0) flag[tid] = 0;
-    flag[tid + 1]=val;
-    __syncthreads();
-    final_res_len = flag[init_nei_len];
-    if (final_res_len == 0) return;
-    if (tid == 0) {
-        res = (unsigned*) malloc(sizeof(unsigned) * final_res_len);
-        temp_row_count[block_id] = final_res_len;
-        temp_res[block_id] = res;
-    }
-    __syncthreads();
-    unsigned pos = flag[tid];
-    if (pos != flag[tid + 1]){
-        res[pos] = init_neibors[tid];
-    }
-
-
-    // if(final_res_len <= 0) return;
-    // if (tid == 0) {
-    //     unsigned* res = (unsigned*)malloc(sizeof(unsigned)*final_res_len);
-    //     unsigned i = 0;
-    //     for (int j = 0; j < neiwithlabel_len; j++) {
-    //         if (init_neibors[j] != -1) res[i++] = init_neibors[j];
-    //     }
-    //     temp_row_count[block_id] = final_res_len;
-    //     temp_res[block_id] = res;
-    // }
-
-}
 
 __global__ void
 candidate_kernel(unsigned* d_candidate, unsigned* d_candidate_tmp, unsigned candidate_num)
@@ -515,8 +272,10 @@ filter_kernel(unsigned* d_signature_table, unsigned* d_status, unsigned dsize)
         }
     }
     d_status[i] = flag;
-    printf("data id:%d, flag:%d\n", i, flag);
+    // printf("data id:%d, flag:%d\n", i, flag);
 }
+
+
 __global__ void
 scatter_kernel(unsigned* d_status, unsigned* d_cand, unsigned dsize)
 {
@@ -529,9 +288,465 @@ scatter_kernel(unsigned* d_status, unsigned* d_cand, unsigned dsize)
     if(pos != d_status[i+1])
     {
         d_cand[pos] = i;
-        printf("%d\n",i);
+        // printf("%d\n",i);
     }
 }
+
+__global__ void
+first_kernel(unsigned* d_result_tmp_pos) {
+    __shared__ unsigned s_pool1[1024];
+    __shared__ unsigned s_pool2[1024];
+    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned laneid = i & 0x1f;
+    unsigned warpid = i >> 5; //group ID
+	/*printf("compare %d and %d\n", i, result_row_num);*/
+	if(warpid >= c_result_row_num)
+	{
+		return; 
+	}
+    unsigned* record = c_result+warpid*c_result_col_num;
+    unsigned vid = record[c_link_pos];
+    if (laneid == 0) {
+        d_result_tmp_pos[warpid] = c_row_offset[vid+1] - c_row_offset[vid];
+    }
+}
+
+__global__ void
+second_kernel(unsigned* d_result_tmp, unsigned* d_result_tmp_num)
+{
+    __shared__ unsigned s_pool1[1024];
+    __shared__ unsigned s_pool2[1024];//row_pool
+    __shared__ unsigned s_pool3[1024];
+    __shared__ unsigned s_pool4[32];
+	unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned idx = i & 0x1f;
+    i = i >> 5; //group ID(warp index) within the whole kernel
+	if(i >= c_result_row_num)
+	{
+		return; 
+	}
+    unsigned bgroup = threadIdx.x & 0xffffffe0;  //equal to (x/32)*32
+    unsigned gidx = threadIdx.x >> 5;  //warp index within this block
+    if(idx < c_result_col_num)
+    {
+        s_pool2[bgroup+idx] = c_result[i*c_result_col_num+idx];
+    }
+    d_result_tmp += c_result_tmp_pos[i];
+    unsigned vid = s_pool2[bgroup + c_link_pos];
+    unsigned size = c_row_offset[vid + 1] - c_row_offset[vid];
+    unsigned* list = c_col_offset + c_row_offset[vid];
+    unsigned pos = 0;
+    unsigned loop = size >> 5;
+    size = size & 0x1f;
+    unsigned pred, presum;
+    unsigned cand_num = 0;
+    s_pool4[gidx] = 0;
+    
+    for (int j = 0; j < loop;++j, pos += 32) {
+        s_pool1[bgroup + idx] = list[pos + idx];
+        unsigned k;
+        //减去该行已匹配的点
+        for(k = 0; k < c_result_col_num; ++k)
+        {
+            if(s_pool2[bgroup+k] == s_pool1[bgroup+idx])
+            {
+                break;
+            }
+        }
+        pred = 0;
+        //与C(u)作交集
+        if(k == c_result_col_num)
+        {
+            unsigned num = s_pool1[bgroup+idx] >> 5;
+            unsigned res = s_pool1[bgroup+idx] & 0x1f;
+            res = 1 << res;
+            if((c_candidate[num] & res) == res)
+            {
+                pred = 1;
+            }
+        }
+        presum = pred;
+
+        for(unsigned stride = 1; stride < 32; stride <<= 1)
+        {
+            //NOTICE: this must be called by the whole warp, not placed in the judgement
+            unsigned tmp = __shfl_up(presum, stride);
+            if(idx >= stride)
+            {
+                presum += tmp;
+            }
+        }
+        //this must be called first, only in inclusive-scan the 31-th element is the sum
+        unsigned total = __shfl(presum, 31);  //broadcast to all threads in the warp
+        //transform inclusive prefixSum to exclusive prefixSum
+        presum = __shfl_up(presum, 1);
+        //NOTICE: for the first element, the original presum value is copied
+        if(idx == 0)
+        {
+            presum = 0;
+        }
+        if(pred == 1)
+        {
+            if(s_pool4[gidx]+presum < 32)
+            {
+                s_pool3[bgroup+s_pool4[gidx]+presum] = s_pool1[bgroup+idx];
+            }
+        }
+        //flush 128B: one 4-segment writes is better than four 1-segment writes
+        if(s_pool4[gidx]+total >= 32)
+        {
+            d_result_tmp[cand_num+idx] = s_pool3[bgroup+idx];
+            cand_num += 32;
+            if(pred == 1)
+            {
+                unsigned pos = s_pool4[gidx] + presum;
+                if(pos>=32)
+                {
+                    s_pool3[bgroup+pos-32] = s_pool1[bgroup+idx];
+                }
+            }
+            s_pool4[gidx] = s_pool4[gidx] + total - 32;
+        }
+        else
+        {
+            //NOTICE:for a warp this is ok due to SIMD feature: sync read and sync write
+            s_pool4[gidx] += total;
+        }
+
+    }
+    //处理剩余的邻居
+    presum = pred = 0; //init all threads to 0s first because later there is a judgement
+    if(idx < size)
+    {
+        s_pool1[bgroup+idx] = list[pos+idx];
+        unsigned k;
+        for(k = 0; k < c_result_col_num; ++k)
+        {
+            if(s_pool2[bgroup+k] == s_pool1[bgroup+idx])
+            {
+                break;
+            }
+        }
+        if(k == c_result_col_num)
+        {
+            unsigned num = s_pool1[bgroup+idx] >> 5;
+            unsigned res = s_pool1[bgroup+idx] & 0x1f;
+            res = 1 << res;
+            if((c_candidate[num] & res) == res)
+            {
+                pred = 1;
+            }
+        }
+        presum = pred;
+    }
+    for(unsigned stride = 1; stride < 32; stride <<= 1)
+    {
+        unsigned tmp = __shfl_up(presum, stride);
+        if(idx >= stride)
+        {
+            presum += tmp;
+        }
+    }
+    unsigned total = __shfl(presum, 31);  //broadcast to all threads in the warp
+    presum = __shfl_up(presum, 1);
+    if(idx == 0)
+    {
+        presum = 0;
+    }
+    if(pred == 1)
+    {
+        if(s_pool4[gidx]+presum < 32)
+        {
+            s_pool3[bgroup+s_pool4[gidx]+presum] = s_pool1[bgroup+idx];
+        }
+    }
+    unsigned newsize = s_pool4[gidx] + total;
+    if(newsize >= 32)
+    {
+        d_result_tmp[cand_num+idx] = s_pool3[bgroup+idx];
+        cand_num += 32;
+        if(pred == 1)
+        {
+            unsigned pos = s_pool4[gidx] + presum;
+            if(pos>=32)
+            {
+                d_result_tmp[cand_num+pos-32] = s_pool1[bgroup+idx];
+            }
+        }
+        cand_num += (newsize - 32);
+    }
+    else
+    {
+        if(idx < newsize)
+        {
+            d_result_tmp[cand_num+idx] = s_pool3[bgroup+idx];
+        }
+        cand_num += newsize;
+    }
+
+    if(idx == 0)
+    {
+        d_result_tmp_num[i] = cand_num;
+    }
+
+}
+
+__global__ void
+join_kernel(unsigned* d_result_tmp, unsigned* d_result_tmp_num)
+{
+    __shared__ unsigned s_pool1[1024];
+    __shared__ unsigned s_pool2[1024];
+    __shared__ unsigned s_pool3[1024];
+    __shared__ unsigned s_pool4[32];
+	unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned idx = i & 0x1f;
+    i = i >> 5; //group ID
+	if(i >= c_result_row_num)
+	{
+		return; 
+	}
+
+	unsigned res_num = d_result_tmp_num[i];
+    //NOTICE: though invalid rows exist, but a warp will end directly here and not occupy resource any more(no divergence)
+    if(res_num == 0)   //early termination
+    {
+        return;
+    }
+    unsigned bgroup = threadIdx.x & 0xffffffe0;  //equal to (x/32)*32
+    unsigned gidx = threadIdx.x >> 5;
+    if(idx == 0)
+    {
+        s_pool2[bgroup+c_link_pos] = c_result[i*c_result_col_num+c_link_pos];
+    }
+
+    unsigned vid = s_pool2[bgroup+c_link_pos];
+    unsigned list_num = c_row_offset[vid + 1] - c_row_offset[vid];
+    unsigned* list = c_col_offset + c_row_offset[vid];
+    d_result_tmp += c_result_tmp_pos[i];
+    unsigned pos1 = 0, pos2 = 0;
+    unsigned pred, presum;
+    unsigned cand_num = 0;
+    int choice = 0;
+    s_pool4[gidx] = 0;
+    while(pos1 < res_num && pos2 < list_num)
+    {
+        if(choice <= 0)
+        {
+            s_pool1[bgroup+idx] = INVALID;
+            if(pos1 + idx < res_num)
+            {
+                s_pool1[bgroup+idx] = d_result_tmp[pos1+idx];
+            }
+        }
+        if(choice >= 0)
+        {
+            s_pool2[bgroup+idx] = INVALID;
+            if(pos2 + idx < list_num)
+            {
+                s_pool2[bgroup+idx] = list[pos2+idx];
+            }
+        }
+        pred = 0;  //some threads may fail in the judgement below
+        unsigned valid1 = (pos1+32<res_num)?32:(res_num-pos1);
+        unsigned valid2 = (pos2+32<list_num)?32:(list_num-pos2);
+        if(pos1 + idx < res_num)
+        {
+            pred = binary_search(s_pool1[bgroup+idx], s_pool2+bgroup, valid2);
+            if(pred != INVALID)
+            {
+                pred = 1;
+            }
+            else
+            {
+                pred = 0;
+            }
+        }
+        presum = pred;
+        for(unsigned stride = 1; stride < 32; stride <<= 1)
+        {
+            unsigned tmp = __shfl_up(presum, stride);
+            if(idx >= stride)
+            {
+                presum += tmp;
+            }
+        }
+        unsigned total = __shfl(presum, 31);  //broadcast to all threads in the warp
+        presum = __shfl_up(presum, 1);
+        if(idx == 0)
+        {
+            presum = 0;
+        }
+        if(pred == 1)
+        {
+            if(s_pool4[gidx]+presum < 32)
+            {
+                s_pool3[bgroup+s_pool4[gidx]+presum] = s_pool1[bgroup+idx];
+            }
+        }
+        if(s_pool4[gidx]+total >= 32)
+        {
+            d_result_tmp[cand_num+idx] = s_pool3[bgroup+idx];
+            cand_num += 32;
+            if(pred == 1)
+            {
+                unsigned pos = s_pool4[gidx] + presum;
+                if(pos>=32)
+                {
+                    s_pool3[bgroup+pos-32] = s_pool1[bgroup+idx];
+                }
+            }
+            s_pool4[gidx] = s_pool4[gidx] + total - 32;
+        }
+        else
+        {
+            s_pool4[gidx] += total;
+        }
+
+        //set the next movement
+        choice = s_pool1[bgroup+valid1-1] - s_pool2[bgroup+valid2-1];
+        if(choice <= 0)
+        {
+            pos1 += 32;
+        }
+        if(choice >= 0)
+        {
+            pos2 += 32;
+        }
+    }
+    if(idx < s_pool4[gidx])
+    {
+        d_result_tmp[cand_num+idx] = s_pool3[bgroup+idx];
+    }
+    cand_num += s_pool4[gidx];
+
+    if(idx == 0)
+    {
+        d_result_tmp_num[i] = cand_num;
+    }
+
+
+}
+
+__global__ void
+link_kernel(unsigned* d_result_tmp, unsigned* d_result_tmp_pos, unsigned* d_result_tmp_num, unsigned* d_result_new)
+{
+    //BETTER:consider bank conflicts here, should we use column-oriented table for global memory and shared memory?
+    //In order to keep in good occupancy(>=50%), the shared mem usage should <= 24KB for 1024-threads block
+    __shared__ unsigned cache[1024];
+    /*__shared__ unsigned s_pool[1024*5];  //the work poll*/
+    //NOTICE: though a block can be synchronized, we should use volatile to ensure data is not cached in private registers
+    //If shared mem(or global mem) is used by a warp, then volatile is not needed.
+    //http://www.it1352.com/539600.html
+    /*volatile __shared__ unsigned swpos[1024];*/
+    __shared__ unsigned swpos[32];
+
+	unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    i >>= 5;
+    //NOTICE: we should not use this if we want to control the whole block
+    //(another choice is to abandon the border block)
+	/*if(i >= c_result_row_num)*/
+	/*{*/
+		/*return; */
+	/*}*/
+    unsigned bgroup = threadIdx.x & 0xffffffe0;  //equal to (x/32)*32
+    unsigned idx = threadIdx.x & 0x1f;  //thread index within the warp
+    unsigned gidx = threadIdx.x >> 5; //warp ID within the block
+
+    unsigned tmp_begin = 0, start = 0, size = 0;
+    if(i < c_result_row_num)
+    {
+        tmp_begin = d_result_tmp_pos[i];
+        start = d_result_tmp_num[i];
+        //NOTICE: the size is ok to be 0 here
+        size = d_result_tmp_num[i+1] - start;
+        start *= (c_result_col_num+1);
+    }
+
+    //Usage of Shared Memory: cache records only when size > 0
+    if(idx == 0)
+    {
+        if(size > 0)
+        {
+            //NOTICE: we use a single thread to read a batch a time
+            memcpy(cache+gidx*32, c_result+i*c_result_col_num, sizeof(unsigned)*c_result_col_num);
+        }
+    }
+    unsigned curr = 0;
+    unsigned* record = cache + gidx * 32;
+
+    //Usage of Load Balance
+    __syncthreads();
+    //use a block to deal with tasks >=1024
+    while(true)
+    {
+        if(threadIdx.x == 0)
+        {
+            swpos[0] = INVALID;
+        }
+        //NOTICE: the sync function is needed, but had better not use it too much 
+        //It is costly, which may stop the running warps and replace them with other warps
+        __syncthreads();
+        if(size >= curr+1024)
+        {
+            swpos[0] = gidx;
+        }
+        __syncthreads();
+        if(swpos[0] == INVALID)
+        {
+            break;
+        }
+        //WARN:output info within kernel function will degrade perfomance heavily
+        //printf("FOUND: use a block!\n");
+        unsigned* ptr = cache + 32 * swpos[0];
+        if(swpos[0] == gidx)
+        {
+            swpos[1] = tmp_begin;
+            swpos[2] = start;
+            swpos[3] = curr;
+            swpos[4] = size;
+        }
+        __syncthreads();
+        //NOTICE: here we use a block to handle the task as much as possible
+        //(this choice may save the work of preparation)
+        //Another choice is only do 1024 and set size-=1024, later vote again
+        while(swpos[3]+1023 <swpos[4])
+        {
+            unsigned pos = (c_result_col_num+1)*(swpos[3]+threadIdx.x);
+            memcpy(d_result_new+swpos[2]+pos, ptr, sizeof(unsigned)*c_result_col_num);
+            d_result_new[swpos[2]+pos+c_result_col_num] = d_result_tmp[swpos[1]+swpos[3]+threadIdx.x];
+            if(threadIdx.x == 0)
+            {
+                swpos[3] += 1024;
+            }
+            __syncthreads();
+        }
+        if(swpos[0] == gidx)
+        {
+            curr = swpos[3];
+        }
+        __syncthreads();
+    }
+    __syncthreads();
+
+    //combine the tasks of rows and divide equally
+    //NOTICE: though we can combine even when the tasks of some row is very small, it is not good.
+    //(the time of combining may be consuming compared to using exactly a warp for each row, when the size is nearly 32)
+
+    while(curr < size)
+    {
+        //this judgement is fine, only causes divergence in the end
+        if(curr+idx < size)
+        {
+            unsigned pos = (c_result_col_num+1)*(curr+idx);
+            memcpy(d_result_new+start+pos, record, sizeof(unsigned)*c_result_col_num);
+            d_result_new[start+pos+c_result_col_num] = d_result_tmp[tmp_begin+curr+idx];
+        }
+        curr += 32;
+    }
+    //BETTER: the implementation of memcpy() may be optimized for single thread with batch read/write
+    //using a struct representing more bytes? or use vload4
+}
+
 
 bool
 Match::filter(float* _score, int* _qnum) {
@@ -600,16 +815,12 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 	long t0 = Util::get_cur_time();
 	// copyGraphToGPU();
     //在GPU端分配内存，存储data图结构
-    unsigned * d_row_offset, *d_col_nei_offset, *d_col_label_offset, *d_col_offset;
+    unsigned * d_row_offset, *d_col_offset;
     unsigned vertex_count = this->data->vertex_num, edge_count = this->data->undir_edge_num;
     copyHtoD(d_row_offset, this->data->row_offset, sizeof(unsigned) * (vertex_count + 1));
-    copyHtoD(d_col_nei_offset, this->data->col_nei_offset, sizeof(unsigned) * edge_count);
-    copyHtoD(d_col_label_offset, this->data->col_label_offset, sizeof(unsigned) * edge_count);
     copyHtoD(d_col_offset, this->data->col_offset, sizeof(unsigned) * edge_count);
 
     cudaMemcpyToSymbol(c_row_offset, &d_row_offset, sizeof(unsigned*));
-    cudaMemcpyToSymbol(c_col_index, &d_col_nei_offset, sizeof(unsigned*));
-    cudaMemcpyToSymbol(c_col_label, &d_col_label_offset, sizeof(unsigned*));
     cudaMemcpyToSymbol(c_col_offset, &d_col_offset, sizeof(unsigned*));    
     cudaMemcpyToSymbol(c_data_vertex_count, &vertex_count, sizeof(unsigned));
     cudaMemcpyToSymbol(c_data_edge_count, &edge_count, sizeof(unsigned));
@@ -730,10 +941,9 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 		checkCudaErrors(cudaGetLastError());
         
         
-        cudaMemcpyToSymbol(c_link_count, &link_num, sizeof(unsigned));
-        cudaMemcpyToSymbol(c_link_pos, link_pos, sizeof(unsigned) * link_num);
-
+        printf("step = %d, result_row_num = %d\n",step, result_row_num);
         success = this->join(node_label, link_pos, link_num, d_result, d_candidate, candidate_num, result_row_num, result_col_num);
+        
         #ifdef DEBUG
 	    checkCudaErrors(cudaGetLastError());
         #endif
@@ -742,6 +952,8 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
         idx = idx2;
         
     }
+    long t8 = Util::get_cur_time();
+    cout<<"total time cost:"<<t8 - t1<<"ms"<<endl;
     if (success) {
         final_result = new unsigned[result_row_num * result_col_num];
         cudaMemcpy(final_result, d_result, sizeof(unsigned) * result_row_num * result_col_num, cudaMemcpyDeviceToHost);
@@ -761,37 +973,127 @@ Match::match(IO& io, unsigned*& final_result, unsigned& result_row_num, unsigned
 bool
 Match::join(unsigned label, int* link_pos,int link_num, unsigned*& d_result, unsigned* d_candidate, unsigned d_cand_num, unsigned& result_row_num, unsigned& result_col_num)
 {
-
-   unsigned BLOCKSIZE = 1024;
-   unsigned GRIDSIZE = result_row_num;
-   cudaMemcpyToSymbol(c_candidate, &d_candidate, sizeof(unsigned*));
-
-   join_kernel<<<GRIDSIZE, BLOCKSIZE>>>(label, d_result, d_candidate, result_row_num, result_col_num);
-   cudaDeviceSynchronize();
-   #ifdef DEBUG
+    unsigned sum;
+	unsigned* d_result_tmp = NULL;
+	unsigned* d_result_tmp_pos = NULL;
+	unsigned* d_result_tmp_num = NULL;
+	cudaMalloc(&d_result_tmp_pos, sizeof(unsigned)*(result_row_num+1));
+	cudaMalloc(&d_result_tmp_num, sizeof(unsigned)*(result_row_num+1));
+#ifdef DEBUG
 	checkCudaErrors(cudaGetLastError());
-   #endif
-
-   exclusive_sum(temp_row_count, result_row_num + 1);
-//    unsigned* h_temp_row_count = new unsigned[result_row_num + 1];
-//    cudaMemcpyFromSymbol(h_temp_row_count, temp_row_count, sizeof(unsigned) * (result_row_num + 1));
-   unsigned new_result_row_num = temp_row_count[result_row_num];
-   if (new_result_row_num == 0) return false;
-   unsigned temp_res_size = new_result_row_num * (result_col_num + 1);
-   unsigned* d_new_result;
-   cudaMalloc(&d_new_result, sizeof(unsigned) * temp_res_size);
-   link_kernel<<<GRIDSIZE, BLOCKSIZE>>>(d_result, d_new_result, result_col_num, result_row_num);
-   cudaDeviceSynchronize();
+#endif
+    cudaMemcpyToSymbol(c_result, &d_result, sizeof(unsigned*));
+	cudaMemcpyToSymbol(c_candidate, &d_candidate, sizeof(char*));
+	/*cudaMemcpyToSymbol(c_candidate_num, &num, sizeof(unsigned));*/
+	cudaMemcpyToSymbol(c_result_row_num, &result_row_num, sizeof(unsigned));
+	cudaMemcpyToSymbol(c_result_col_num, &result_col_num, sizeof(unsigned));
+    int BLOCK_SIZE = 1024;
+    int GRID_SIZE = (result_row_num*32+BLOCK_SIZE-1)/BLOCK_SIZE;
    #ifdef DEBUG
+        cout<<"now to do join kernel "<<result_row_num<<" "<<result_col_num<<" "<<GRID_SIZE<<" "<<BLOCK_SIZE<<endl;
+#endif
+	long begin = Util::get_cur_time();
+    for (int i = 0; i < link_num; i++) {
+        cudaMemcpyToSymbol(c_link_pos, link_pos+i, sizeof(unsigned));
+        cudaMemcpyToSymbol(c_result_tmp_pos, &d_result_tmp_pos, sizeof(unsigned*));
+        cout<<"the "<<i<<"-th edge"<<endl;
+        if (i == 0) {
+            first_kernel<<<GRID_SIZE, BLOCK_SIZE>>>(d_result_tmp_pos);
+            cudaDeviceSynchronize();
+            checkCudaErrors(cudaGetLastError());
+            cout<<"first kernel finished"<<endl;
+
+            /*thrust::device_ptr<unsigned> dev_ptr(d_result_tmp_pos);*/
+            /*thrust::exclusive_scan(dev_ptr, dev_ptr+result_row_num+1, dev_ptr);*/
+            exclusive_sum(d_result_tmp_pos, result_row_num+1);
+
+            cudaMemcpy(&sum, &d_result_tmp_pos[result_row_num], sizeof(unsigned), cudaMemcpyDeviceToHost);
+            cout<<"To malloc on GPU: "<<sizeof(unsigned)*sum<<endl;
+            assert(sum < 2000000000);  //keep the bytes < 8GB
+            cudaMalloc(&d_result_tmp, sizeof(unsigned)*sum);
+            checkCudaErrors(cudaGetLastError());
+            second_kernel<<<GRID_SIZE, BLOCK_SIZE>>>(d_result_tmp, d_result_tmp_num);
+        }
+        {
+            join_kernel<<<GRID_SIZE, BLOCK_SIZE>>>(d_result_tmp, d_result_tmp_num);
+        }
+        cudaDeviceSynchronize();
+        checkCudaErrors(cudaGetLastError());
+        cout<<"iteration kernel finished"<<endl;
+    }
+    long end = Util::get_cur_time();
+	cerr<<"join_kernel used: "<<(end-begin)<<"ms"<<endl;
+#ifdef DEBUG
+	cout<<"join kernel finished"<<endl;
+#endif
+
+	/*thrust::device_ptr<unsigned> dev_ptr(d_result_tmp_num);*/
+	/*//link the temp result into a new table*/
+	/*thrust::exclusive_scan(dev_ptr, dev_ptr+result_row_num+1, dev_ptr);*/
+    exclusive_sum(d_result_tmp_num, result_row_num+1);
+#ifdef DEBUG
 	checkCudaErrors(cudaGetLastError());
-   #endif
-   clean_kernel<<<GRIDSIZE,BLOCKSIZE>>>(result_row_num);
-   cudaDeviceSynchronize();
-   result_row_num = new_result_row_num;
-   result_col_num++;
-   cudaFree(d_result);
-   d_result = d_new_result;
-   return true;
+#endif
+	/*sum = thrust::reduce(dev_ptr, dev_ptr+result_row_num);*/
+	cudaMemcpy(&sum, d_result_tmp_num+result_row_num, sizeof(unsigned), cudaMemcpyDeviceToHost);
+	//BETTER: judge if success here
+	/*cout<<"new table num: "<<sum<<endl;*/
+	/*int tmp = 0;*/
+	/*for(int i = 0; i < result_row_num; ++i)*/
+	/*{*/
+		/*cudaMemcpy(&tmp, d_result_tmp_num+i, sizeof(int), cudaMemcpyDeviceToHost);*/
+		/*cout<<"check tmp: "<<tmp<<endl;*/
+	/*}*/
+#ifdef DEBUG
+	checkCudaErrors(cudaGetLastError());
+#endif
+
+	unsigned* d_result_new = NULL; 
+	if(sum > 0)
+	{
+		cudaMalloc(&d_result_new, sizeof(unsigned)*sum*(result_col_num+1));
+#ifdef DEBUG
+		checkCudaErrors(cudaGetLastError());
+#endif
+		/*BLOCK_SIZE = 512;*/
+		/*GRID_SIZE = (result_row_num+BLOCK_SIZE-1)/BLOCK_SIZE;*/
+		//BETTER?: combine into a large array(value is the record id) and link per element
+		long begin = Util::get_cur_time();
+		link_kernel<<<GRID_SIZE, BLOCK_SIZE>>>(d_result_tmp, d_result_tmp_pos, d_result_tmp_num, d_result_new);
+		checkCudaErrors(cudaGetLastError());
+		cudaDeviceSynchronize();
+		long end = Util::get_cur_time();
+#ifdef DEBUG
+		cerr<<"link_kernel used: "<<(end-begin)<<"ms"<<endl;
+#endif
+#ifdef DEBUG
+		checkCudaErrors(cudaGetLastError());
+#endif
+	}
+    //if the original result table is exactly the first candidate set, then here also delete it
+    cudaFree(d_result);
+#ifdef DEBUG
+	checkCudaErrors(cudaGetLastError());
+#endif
+	d_result = d_result_new;
+
+	cudaFree(d_result_tmp);  
+	cudaFree(d_result_tmp_pos);  
+	cudaFree(d_result_tmp_num);  
+#ifdef DEBUG
+	checkCudaErrors(cudaGetLastError());
+#endif
+	result_col_num++;
+	result_row_num = sum;
+
+	if(result_row_num == 0)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
 }
 
 

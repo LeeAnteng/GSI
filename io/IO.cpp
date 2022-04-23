@@ -45,7 +45,8 @@ IO::IO(string query, string data, string file)
 Graph* 
 IO::input(FILE* fp)
 {
-	char c1, c2;
+	char c1, c2, c3;
+	char comment[1024];
 	int id0, id1, id2, lb;
 	bool flag = false;
 	Graph* ng = NULL;
@@ -89,6 +90,9 @@ IO::input(FILE* fp)
 			//ng->addEdge(id1, id2, lb+1);
 			ng->addEdge(id1, id2);
 			//ng->addEdge(id2, id1, lb);
+		}
+		else if(c1 == '#') {
+			fscanf(fp, "%*[^\n]%*c");
 		}
 		else 
 		{

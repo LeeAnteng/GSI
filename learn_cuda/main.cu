@@ -17,9 +17,17 @@
 #include "cuda_runtime.h"  
 #include "device_launch_parameters.h"  
 #include <stdio.h>  
-
+#define checkCudaErrors(val) check( (val), #val, __FILE__, __LINE__)
 #define N 10
 using namespace std;
+template<typename T>
+void check(T err, const char* const func, const char* const file, const int line) {
+  if (err != cudaSuccess) {
+    std::cerr << "CUDA error at: " << file << ":" << line << std::endl;
+    std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
+    exit(1);
+  }
+}
 
 __device__ __managed__ unsigned qnum[N];
 __device__ unsigned* temp_res[N];
@@ -144,10 +152,18 @@ __global__ void test2_kernel(unsigned* d_array1, unsigned** d_array2, unsigned a
     d_array1[id] = d_array2[a][id];
 }
 __global__ void test3_kernel() {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid >= N) return;
-    unsigned * aaa = aa + 3;
-    printf("%d ",aaa[tid]);
+    unsigned tid = threadIdx.x;
+    unsigned block_id = blockIdx.x;
+    if(tid == 0) printf("block_id = %d",block_id);
+    __shared__ unsigned* res ;
+    if(tid == 0){
+            printf("res address = %p\n", res);
+        res = (unsigned*) malloc(sizeof(unsigned) * 1024);
+    printf("res address = %p\n", res);
+    }
+    __syncthreads();
+    if (tid < 100)
+    printf("res[%d] = %d\n", tid, res[tid]);
     // b[tid] |= 31;
     // atomicAdd(&b,1);
     // __syncthreads();
@@ -257,16 +273,17 @@ __global__ void work_efficient_scan_kernel(unsigned *X, int InputSize) {
 
 int main()
 {
-    unsigned *d_array;
-    cudaMalloc(&d_array, sizeof(unsigned) * N);
-    unsigned* h_array = new unsigned[N];
-    for (int i = 0;i < N; i++) {
-        h_array[i] = i*3;
-    }
-    cudaMemcpy(d_array, h_array, sizeof(unsigned) * N, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(aa,&d_array,sizeof(unsigned*));
-    test3_kernel<<<1,1024>>>();
+    // unsigned *d_array;
+    // cudaMalloc(&d_array, sizeof(unsigned) * N);
+    // unsigned* h_array = new unsigned[N];
+    // for (int i = 0;i < N; i++) {
+    //     h_array[i] = i*3;
+    // }
+    // cudaMemcpy(d_array, h_array, sizeof(unsigned) * N, cudaMemcpyHostToDevice);
+    // cudaMemcpyToSymbol(aa,&d_array,sizeof(unsigned*));
+    test3_kernel<<<200,1024>>>();
     cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
     // cudaDeviceProp devProp;
     // cudaGetDeviceProperties(&devProp, dev);
     // std::cout << "使用GPU device " << dev << ": " << devProp.name << std::endl;

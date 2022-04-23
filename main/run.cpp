@@ -62,7 +62,7 @@ main(int argc, const char * argv[])
 	query_graph->buildCSR();
 	data_graph->buildCSR();
 	query_graph->buildSignature(false);
-	data_graph->printCSR();
+	// data_graph->printCSR();
 	// data_graph->buildSignature(false);
 	// query_graph->printSig();
 	// data_graph->printSig();
