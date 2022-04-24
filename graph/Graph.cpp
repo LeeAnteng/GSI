@@ -72,7 +72,8 @@ Graph::buildSignature(bool col_oriented) {
 
         Vertex& v = this->vertices[i];
         int basei = SIGNUM * i;
-        sig_table[basei] = v.label;
+        //label 取值范围 0—31
+        sig_table[basei] = 1 << v.label;
         int pos;
         for (const auto& nei: v.neighbors) {
 
