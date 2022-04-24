@@ -265,8 +265,10 @@ filter_kernel(unsigned* d_signature_table, unsigned* d_status, unsigned dsize)
         //BETTER: reduce memory access here?
         if(flag)
         {
+            if(j == 0) flag = (usig == vsig) ? 1: 0;//第一个lablel用特判
+            else flag = ((usig & vsig) == usig)?1:0;
             //WARN: usig&vsig==usig is not right because the priority of == is higher than bitwise operation
-            flag = ((usig & vsig) == usig)?1:0;
+            
             //WARN: below is wrong because usig may have many 1s
             /*flag = ((usig & vsig) != 0)?1:0;*/
         }

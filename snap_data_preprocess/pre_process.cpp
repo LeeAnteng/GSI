@@ -69,11 +69,13 @@ int main(int argc, const char * argv[]) {
     fprintf(ofp, "# node_count = %d, edges_count = %d, maxdegree = %d\n", vertex_count, edge_count, maxdegree);
     fprintf(ofp, "t # 0\n");
     fprintf(ofp, "%d %d %d 1\n", vertex_count, edge_count, label_count);
+    srand((unsigned int)(time(NULL)));
     for (int j = 0; j < vertex_count; j++) {
+        
         fprintf(ofp, "v %d %d\n",j,rand()%label_count + 1);
     }
     for (auto& edge: new_edge) {
-        fprintf(ofp, "e %d %d\n", edge.first, edge.second);
+        fprintf(ofp, "e %d %d 1\n", edge.first, edge.second);
     }
     fprintf(ofp, "t # -1\n");
     fclose(ofp);
